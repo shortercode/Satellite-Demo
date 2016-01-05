@@ -1,0 +1,205 @@
+<script>
+//Happy Particles!
+var controller;
+var context;
+var center;
+var canvas;
+
+var createClass = function(obj) {
+	var fn = obj.__init__;
+	fn.prototype = obj;	
+	return fn;
+};
+
+var createElement = function(obj) {
+	var i;
+	var element;
+
+	if(typeof obj !== 'object' || typeof obj.tagName !== 'string')
+		throw 'Element not correctly defined';
+	
+	element = document.createElement(obj.tagName);
+
+	for(i in obj){
+		switch(i){
+			case 'tagName': 
+				break;
+				
+			case 'parentNode':
+				obj[i].appendChild(element);
+				break;
+
+			case 'style':
+				if( typeof obj.style === 'string' ){
+					element.style.cssText = obj.style;
+				}else{
+					throw 'Style TypeError - '+ typeof obj.style;
+				}
+				break;
+
+			default:
+				element[i] = obj[i];
+				break;
+
+		}
+	}
+
+	return element;
+};
+
+var random = function(min,max){
+	return Math.random() * (max - min) + min;
+}
+
+var Vector2 = createClass({
+	__init__:function(x,y) {
+		this.x = +x || 0;
+		this.y = +y || 0;
+	},
+	add:function(x,y){
+		this.x += x;
+		this.y += y;
+	}
+});
+
+var Particle = createClass({
+	__init__:function(m,x,y) {
+		this.pos = new Vector2(x,y);
+		this.cpos = new Vector2(x-center.x,y-center.y);
+		this.vel = new Vector2(0,0);
+		this.acc = new Vector2(0,0);
+		this.color = 'black';
+		
+		this.tail = [];
+		
+		this.mass = m|0;
+		this.force = new Vector2(0,0);
+	},
+	tick:function(time) {
+		//pos
+		this.pos.x += this.vel.x * time;
+		this.pos.y += this.vel.y * time;
+		
+		//cpos
+		this.cpos.x = this.pos.x-center.x;
+		this.cpos.y = this.pos.y-center.y
+		
+		//vel
+		this.vel.x += this.acc.x * time;
+		this.vel.y += this.acc.y * time;
+		
+		//acc
+		this.force.x = 0;
+		this.force.y = 0;// = new Vector2(random(-1,1),random(-1,1));
+		//center gravity
+		var G = Math.pow(this.cpos.x,2)+Math.pow(this.cpos.y,2);
+		G = G < 1? 1 : G;
+		
+		G = ( this.mass * 1E6 ) / G
+		G = G / Math.sqrt(Math.pow(this.cpos.x,2)+Math.pow(this.cpos.y,2));
+		
+		this.force.x -= this.cpos.x * G;
+		this.force.y -= this.cpos.y * G;
+		//resistance
+		this.force.x -= 20 * this.vel.x; 
+		this.force.y -= 20 * this.vel.y;
+		//random force
+		//this.force.x += random(-10,10);
+		//this.force.y += random(-10,10);
+		
+		this.acc.x = this.force.x / this.mass;
+		this.acc.y = this.force.y / this.mass;
+		
+		this.tail.push([this.pos.x,this.pos.y]);
+		if(this.tail.length > 200)
+			this.tail.shift();
+	}
+});
+
+var ParticleController = createClass({
+	__init__:function(){
+		var that = this;
+		var time = Date.now();
+		var tdelta = 1000/30;;
+		this.particles = [];
+		setInterval(function(){
+			//tdelta = Date.now() - time;
+			//time = Date.now();
+			
+			for( var i = 0; i < that.particles.length; i++){
+				that.particles[i].tick(tdelta/1000);
+			}
+		},1000/30);
+	},
+	createParticle:function(m,x,y){
+		var p = new Particle(m,x,y);
+		this.particles.push(p);
+		return p;
+	}
+});
+
+var onload = function() {
+	controller = new ParticleController();
+	canvas = createElement({
+		tagName: 'canvas',
+		parentNode: document.body,
+		width: 1000,
+		height: 1000,
+		style: 'border: 1px solid black;'
+	});
+	center = new Vector2(500,500);
+	context = canvas.getContext('2d');
+	
+	var update = function(){
+		requestAnimationFrame(update);
+		context.clearRect(0,0,canvas.width,canvas.height);
+		
+		context.fillRect(
+			center.x-1,
+			center.y-1,
+			2,
+			2
+		);
+		
+		context.beginPath();
+		context.arc(500, 500, 200, 0, 2 * Math.PI, false);
+		context.stroke();
+		
+		var l = controller.particles.length;
+		while(l--) {
+			context.fillRect(
+				controller.particles[l].pos.x-2,
+				controller.particles[l].pos.y-2,
+				4,
+				4
+			);
+			context.beginPath()
+			var i = controller.particles[l].tail.length;
+			if(!i)continue;
+			i--;
+			context.moveTo(controller.particles[l].tail[i][0],controller.particles[l].tail[i][1]);
+			while(i--) {
+				context.lineTo(controller.particles[l].tail[i][0],controller.particles[l].tail[i][1]);
+			}
+			context.stroke();
+		}
+		
+	};
+	var i = 200;
+	var x;
+	var y;
+	var t;
+	var p;
+	while(i--){
+		t = random(0,2) * Math.PI;
+		x = 200 * Math.cos(t);
+		y = 200 * Math.sin(t);
+		p = controller.createParticle(1000,500+x,500+y);
+		p.vel.x = y /3;
+		p.vel.y = -x /3;
+	}
+	requestAnimationFrame(update);
+	window.removeEventListener('load',onload,false);
+};
+window.addEventListener('load',onload,false);
+</script>
